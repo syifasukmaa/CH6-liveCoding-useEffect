@@ -51,32 +51,79 @@ const average = (arr) =>
   arr.reduce((acc, cur, i, arr) => acc + cur / arr.length, 0);
 
 export default function App() {
+  const [query, setQuery] = useState('');
   const [movies, setMovies] = useState(tempMovieData);
+  // eslint-disable-next-line no-unused-vars
   const [watched, setWatched] = useState(tempWatchedData);
   const [isLoading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [type, setType] = useState('Movie');
 
-  useEffect(function () {
-    async function getMovies() {
-      setLoading(true);
-      const response = await fetch(
-        `https://www.omdbapi.com/?s=scary&apikey=6cf2e016`
-      );
-      const data = await response.json();
-      setMovies(data.Search);
-      setLoading(false);
-    }
-    getMovies();
-  }, []);
+
+  useEffect(
+    function () {
+      async function getMovies() {
+        try {
+          setLoading(true);
+          setError('');
+          const response = await fetch(
+            `https://www.omdbapi.com/?s=${query}&apikey=6cf2e016&type=${type}`
+          );
+
+          const data = await response.json();
+          console.log(data);
+
+          if (data.Response === 'False') {
+            throw new Error(data.Error);
+          }
+          if (query.length === 0) {
+            throw new Error('masukkan nama film');
+          }
+          if (query.length < 3) {
+            throw new Error('Harus 3 kata lebih');
+          }
+          setMovies(data.Search);
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+      getMovies();
+    },
+    [query, type]
+  );
+  function handleChangeTypeMovie(type) {
+    setType(type);
+  }
 
   return (
     <>
       <NavBar>
-        <Search />
+        <Search
+          query={query}
+          setQuery={setQuery}
+        />
+        <select
+          className="select"
+          onChange={(e) => handleChangeTypeMovie(e.target.value)}
+        >
+          <option value="movie">Movie</option>
+          <option value="series">Series</option>
+        </select>
         <NumResults movies={movies} />
       </NavBar>
 
       <Main>
-        <Box>{isLoading ? Loader() : <MovieList movies={movies} />}</Box>
+        <Box>
+          <p>saat ini berisi:{type}</p>
+          {isLoading && <Loader />}
+          {!isLoading && !error && <MovieList movies={movies} />}
+          {error && <ErrorMessage message={error} />}
+          {/* {!isLoading && !error && <MovieList movies={movies} />}
+          {isLoading ? <Loader /> : <MovieList movies={movies} />}
+          {error && <ErrorMessage message={error} />} */}
+        </Box>
 
         <Box>
           <WatchedSummary watched={watched} />
@@ -89,6 +136,10 @@ export default function App() {
 
 function Loader() {
   return <p className="loader">Loading...</p>;
+}
+
+function ErrorMessage({ message }) {
+  return <p className="error">Error: {message}</p>;
 }
 
 function NavBar({ children }) {
@@ -109,9 +160,7 @@ function Logo() {
   );
 }
 
-function Search() {
-  const [query, setQuery] = useState('');
-
+function Search({ query, setQuery }) {
   return (
     <input
       className="search"
